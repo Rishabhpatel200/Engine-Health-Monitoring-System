@@ -1,0 +1,667 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aero Piston Engine Digital Twin - GCS</title>
+<style>
+:root{
+  --bg:#0b0f14; --panel:#121820; --panel2:#161d27; --line:#243040;
+  --fg:#dbe4ee; --dim:#8798ab; --accent:#3fa9f5;
+  --ok:#37c98b; --caution:#e8b73a; --warn:#f0743a; --crit:#ef4a5a;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);
+  font:13px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+h1,h2,h3{margin:0;font-weight:600}
+.mono{font-family:var(--mono)}
+header{display:flex;align-items:center;gap:16px;padding:10px 16px;
+  background:linear-gradient(180deg,#141c26,#0e141b);border-bottom:1px solid var(--line);
+  position:sticky;top:0;z-index:20;flex-wrap:wrap}
+header h1{font-size:15px;letter-spacing:.3px}
+header .sub{color:var(--dim);font-size:11px}
+.badge{padding:4px 10px;border-radius:4px;font-weight:700;font-size:12px;letter-spacing:.5px}
+.b-green{background:rgba(55,201,139,.15);color:var(--ok);border:1px solid rgba(55,201,139,.4)}
+.b-amber{background:rgba(232,183,58,.15);color:var(--caution);border:1px solid rgba(232,183,58,.4)}
+.b-red{background:rgba(239,74,90,.18);color:var(--crit);border:1px solid rgba(239,74,90,.5)}
+.spacer{flex:1}
+button,select,input{background:var(--panel2);color:var(--fg);border:1px solid var(--line);
+  border-radius:4px;padding:5px 9px;font-size:12px;font-family:inherit}
+button{cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.pri{background:#17364d;border-color:#2b6c99}
+.tabs{display:flex;gap:2px;padding:0 16px;background:#0e141b;border-bottom:1px solid var(--line)}
+.tab{padding:8px 16px;cursor:pointer;color:var(--dim);border-bottom:2px solid transparent;font-size:12px}
+.tab.on{color:var(--fg);border-bottom-color:var(--accent)}
+main{padding:12px 16px 40px}
+.grid{display:grid;gap:12px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.panel > .hd{padding:7px 11px;background:var(--panel2);border-bottom:1px solid var(--line);
+  font-size:11px;letter-spacing:.7px;text-transform:uppercase;color:var(--dim);
+  display:flex;align-items:center;gap:8px}
+.panel > .bd{padding:11px}
+.gauges{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:9px}
+.g{background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:8px 9px;position:relative}
+.g .lbl{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px}
+.g .val{font-family:var(--mono);font-size:20px;font-weight:600;line-height:1.25}
+.g .unit{font-size:10px;color:var(--dim);margin-left:3px}
+.g .bar{height:4px;background:#1d2632;border-radius:2px;margin-top:6px;overflow:hidden;position:relative}
+.g .bar i{display:block;height:100%;background:var(--ok);transition:width .25s}
+.g .ref{font-size:10px;color:var(--dim);font-family:var(--mono);margin-top:3px}
+.g.caution .val{color:var(--caution)} .g.caution .bar i{background:var(--caution)}
+.g.warn .val{color:var(--warn)} .g.warn .bar i{background:var(--warn)}
+.g.crit .val{color:var(--crit)} .g.crit .bar i{background:var(--crit)}
+.g.crit{border-color:rgba(239,74,90,.55);animation:pulse 1.6s infinite}
+@keyframes pulse{50%{background:rgba(239,74,90,.10)}}
+.hbars{display:flex;flex-direction:column;gap:7px}
+.hb{display:grid;grid-template-columns:104px 1fr 46px;align-items:center;gap:9px;font-size:12px}
+.hb .track{height:9px;background:#1d2632;border-radius:5px;overflow:hidden}
+.hb .track i{display:block;height:100%;border-radius:5px;transition:width .3s}
+.hb .n{font-family:var(--mono);text-align:right;font-size:12px}
+.ring{display:flex;align-items:center;gap:14px}
+.ring canvas{flex:0 0 auto}
+.ring .meta div{font-size:11px;color:var(--dim)}
+.ring .meta b{font-size:22px;font-family:var(--mono);color:var(--fg);font-weight:600}
+.cyl{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:4px}
+.cyl .c{background:var(--panel2);border:1px solid var(--line);border-radius:4px;padding:6px;text-align:center}
+.cyl .c .t{font-size:10px;color:var(--dim)}
+.cyl .c .v{font-family:var(--mono);font-size:14px}
+.cyl .c.dev{border-color:var(--warn)}
+.cyl .c.dev .v{color:var(--warn)}
+.list{display:flex;flex-direction:column;gap:7px;max-height:320px;overflow:auto}
+.item{background:var(--panel2);border:1px solid var(--line);border-left-width:3px;
+  border-radius:4px;padding:8px 10px}
+.item .t{font-weight:600;font-size:12px;display:flex;gap:8px;align-items:center}
+.item .d{color:var(--dim);font-size:11px;margin-top:3px}
+.item ul{margin:5px 0 0;padding-left:16px;color:var(--dim);font-size:11px}
+.i-crit{border-left-color:var(--crit)} .i-warn{border-left-color:var(--warn)}
+.i-caution{border-left-color:var(--caution)} .i-ok{border-left-color:var(--ok)}
+.i-info{border-left-color:var(--accent)}
+.tag{font-size:9.5px;padding:2px 6px;border-radius:3px;background:#1d2632;color:var(--dim);
+  letter-spacing:.5px;font-weight:600}
+.tag.crit{background:rgba(239,74,90,.2);color:var(--crit)}
+.tag.warn{background:rgba(240,116,58,.2);color:var(--warn)}
+.tag.caution{background:rgba(232,183,58,.2);color:var(--caution)}
+.tag.ok{background:rgba(55,201,139,.2);color:var(--ok)}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th,td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--line)}
+th{color:var(--dim);font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px}
+td.n,th.n{text-align:right;font-family:var(--mono)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:12px}
+.kv .k{color:var(--dim)}
+.kv .v{font-family:var(--mono);text-align:right}
+canvas.chart{width:100%;display:block}
+.empty{color:var(--dim);font-size:12px;padding:14px;text-align:center}
+.ctl{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.ctl label{color:var(--dim);font-size:11px}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:10.5px;color:var(--dim)}
+.legend i{display:inline-block;width:9px;height:3px;border-radius:2px;margin-right:4px;vertical-align:middle}
+.hide{display:none}
+.note{font-size:10.5px;color:var(--dim);margin-top:6px;line-height:1.5}
+</style>
+</head>
+<body>
+<header>
+  <h1>Aero Piston Engine · Digital Twin</h1>
+  <span class="sub mono" id="hdr-sub">initialising…</span>
+  <span class="badge b-green" id="mission-badge">—</span>
+  <span class="spacer"></span>
+  <div class="ctl">
+    <button class="pri" id="btn-run">▶ Run</button>
+    <button id="btn-pause">❚❚ Pause</button>
+    <label>×</label><select id="speed">
+      <option value="1">1</option><option value="5">5</option>
+      <option value="20" selected>20</option><option value="60">60</option>
+      <option value="200">200</option><option value="600">600</option></select>
+    <select id="profile"></select>
+    <select id="scenario"></select>
+    <label>hrs</label><input id="hours" type="number" value="380" style="width:66px">
+    <button id="btn-reset">Reset</button>
+  </div>
+</header>
+
+<div class="tabs">
+  <div class="tab on" data-t="live">Live</div>
+  <div class="tab" data-t="diag">Diagnostics &amp; AI</div>
+  <div class="tab" data-t="maint">Maintenance</div>
+  <div class="tab" data-t="replay">Replay &amp; Reports</div>
+  <div class="tab" data-t="icd">Architecture / ICD</div>
+</div>
+
+<main>
+<!-- ============================= LIVE ============================= -->
+<section id="v-live">
+  <div class="grid" style="grid-template-columns:2.1fr 1fr">
+    <div class="panel">
+      <div class="hd">Engine parameters <span class="mono" id="regime-tag" style="margin-left:auto"></span></div>
+      <div class="bd"><div class="gauges" id="gauges"></div>
+        <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:11px">
+          <div><div class="lbl" style="font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px">Cylinder head temp (°C)</div><div class="cyl" id="cyl-cht"></div></div>
+          <div><div class="lbl" style="font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px">Exhaust gas temp (°C)</div><div class="cyl" id="cyl-egt"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="hd">Engine health</div>
+      <div class="bd">
+        <div class="ring">
+          <canvas id="ring" width="112" height="112"></canvas>
+          <div class="meta">
+            <div>Overall health index</div><b id="h-overall">—</b>
+            <div style="margin-top:6px">Engine hours <span class="mono" id="h-hours">—</span></div>
+            <div>Regime <span class="mono" id="h-regime">—</span></div>
+            <div>Steady state <span class="mono" id="h-steady">—</span></div>
+          </div>
+        </div>
+        <div class="hbars" id="hbars" style="margin-top:12px"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-top:12px">
+    <div class="panel"><div class="hd">Temperatures</div><div class="bd">
+      <canvas class="chart" id="ch-temp" height="150"></canvas>
+      <div class="legend" id="lg-temp"></div></div></div>
+    <div class="panel"><div class="hd">Efficiency &amp; performance indices</div><div class="bd">
+      <canvas class="chart" id="ch-eff" height="150"></canvas>
+      <div class="legend" id="lg-eff"></div>
+      <div class="note">Each index is the measured value divided by what a new engine
+        would produce at the same speed, manifold pressure, altitude and air temperature.
+        1.00 is a new engine; the operating point is divided out.</div></div></div>
+    <div class="panel"><div class="hd">Health index trend</div><div class="bd">
+      <canvas class="chart" id="ch-health" height="150"></canvas>
+      <div class="legend" id="lg-health"></div></div></div>
+  </div>
+
+  <div class="panel" style="margin-top:12px"><div class="hd">Alerts</div>
+    <div class="bd"><div class="list" id="alerts" style="max-height:190px"></div></div></div>
+</section>
+
+<!-- ========================== DIAGNOSTICS ========================== -->
+<section id="v-diag" class="hide">
+  <div class="grid" style="grid-template-columns:1fr 1fr">
+    <div class="panel"><div class="hd">Anomaly detection (fused)</div><div class="bd">
+      <div class="kv" id="anom-kv"></div>
+      <canvas class="chart" id="ch-anom" height="120" style="margin-top:10px"></canvas>
+      <div class="legend" id="lg-anom"></div>
+      <div style="margin-top:11px;font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.6px">Leading contributors</div>
+      <table id="contrib"><thead><tr><th>Feature</th><th class="n">Share</th><th class="n">σ from baseline</th></tr></thead><tbody></tbody></table>
+      <div class="note">T² measures movement inside the healthy correlation structure;
+        SPE measures movement orthogonal to it — a new relationship between channels that
+        the healthy engine never showed. Contributions decompose the score per feature,
+        so the alert names its own evidence.</div>
+    </div></div>
+    <div class="panel"><div class="hd">Fault isolation — ranked hypotheses</div><div class="bd">
+      <div class="list" id="hyps" style="max-height:420px"></div>
+      <div class="note">Structured-residual isolation: each candidate fault has a
+        prescribed pattern of symptoms it must produce and symptoms it must not. Evidence
+        listed against a hypothesis lowers its confidence.</div>
+    </div></div>
+  </div>
+  <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:12px">
+    <div class="panel"><div class="hd">Observed symptoms</div><div class="bd">
+      <table id="symptoms"><thead><tr><th>Symptom</th><th class="n">Membership</th></tr></thead><tbody></tbody></table></div></div>
+    <div class="panel"><div class="hd">State estimator — normalised innovations</div><div class="bd">
+      <table id="resid"><thead><tr><th>State</th><th class="n">Measured</th><th class="n">Estimate</th><th class="n">±σ</th><th class="n">Innov (σ)</th><th class="n">Bias (σ)</th></tr></thead><tbody></tbody></table>
+      <div class="note">On a healthy engine every innovation is zero-mean and about one
+        sigma. A persistently biased innovation on one channel while the rest stay clean
+        is an instrument fault, not an engine fault.</div></div></div>
+  </div>
+  <div class="panel" style="margin-top:12px"><div class="hd">Fault injection (demonstration)</div><div class="bd">
+    <div class="ctl">
+      <select id="f-kind"></select>
+      <label>cyl</label><select id="f-cyl"><option value="">—</option><option>1</option><option>2</option><option>3</option><option>4</option></select>
+      <label>channel</label><select id="f-chan"><option value="">—</option></select>
+      <label>severity</label><input id="f-sev" type="number" step="0.05" value="0.4" style="width:70px">
+      <label>profile</label><select id="f-prof"><option>ramp</option><option>step</option><option>exponential</option><option>intermittent</option></select>
+      <label>ramp s</label><input id="f-dur" type="number" value="180" style="width:74px">
+      <button class="pri" id="btn-inject">Inject</button>
+      <span class="mono" id="inject-msg" style="color:var(--dim)"></span>
+    </div>
+    <div class="note">Injected faults perturb the simulated engine only. The twin has no
+      knowledge of what was injected — everything it reports is inferred from the CAN
+      signals alone.</div>
+  </div></div>
+</section>
+
+<!-- ========================== MAINTENANCE ========================== -->
+<section id="v-maint" class="hide">
+  <div class="grid" style="grid-template-columns:1.25fr 1fr">
+    <div class="panel"><div class="hd">Maintenance advisories</div><div class="bd">
+      <div class="list" id="advisories" style="max-height:520px"></div></div></div>
+    <div>
+      <div class="panel"><div class="hd">Remaining useful life</div><div class="bd">
+        <div class="kv" id="rul-kv"></div>
+        <table id="rul-tbl" style="margin-top:10px"><thead><tr>
+          <th>Subsystem</th><th class="n">Index</th><th class="n">Rate /h</th>
+          <th class="n">RUL h</th><th class="n">90 % band</th><th class="n">Conf</th></tr></thead><tbody></tbody></table>
+        <div class="note">RUL is published only once the degradation slope is
+          statistically significant (|slope| &gt; 2σ) and is capped at the remaining time to
+          overhaul. "No significant trend" is a valid and common answer.</div>
+      </div></div>
+      <div class="panel" style="margin-top:12px"><div class="hd">Service actions</div><div class="bd">
+        <div class="kv" id="deg-kv"></div>
+        <div class="ctl" style="margin-top:10px">
+          <select id="svc-item">
+            <option value="oil_change">Oil &amp; filter change</option>
+            <option value="spark_plugs">Replace spark plugs</option>
+            <option value="injectors">Clean &amp; flow-match injectors</option>
+            <option value="cooling_clean">Clean radiator &amp; oil cooler</option>
+            <option value="top_overhaul">Top overhaul</option>
+            <option value="overhaul">Full overhaul (zero-time)</option>
+          </select>
+          <button id="btn-service">Apply</button>
+          <span class="mono" id="svc-msg" style="color:var(--dim)"></span>
+        </div>
+      </div></div>
+    </div>
+  </div>
+</section>
+
+<!-- =========================== REPLAY ============================= -->
+<section id="v-replay" class="hide">
+  <div class="panel"><div class="hd">Recorded sorties</div><div class="bd">
+    <div class="ctl"><button id="btn-sessions">Refresh</button>
+      <select id="sessions" style="min-width:340px"></select>
+      <button class="pri" id="btn-load">Load mission report</button></div>
+    <div id="report" style="margin-top:12px"></div>
+  </div></div>
+</section>
+
+<!-- ============================= ICD ============================== -->
+<section id="v-icd" class="hide">
+  <div class="grid" style="grid-template-columns:1fr 1fr">
+    <div class="panel"><div class="hd">CAN interface control document</div><div class="bd">
+      <div class="kv" id="can-kv"></div>
+      <table id="pgns" style="margin-top:10px"><thead><tr><th>CAN ID</th><th>PGN</th>
+        <th class="n">Hz</th><th>Signals</th></tr></thead><tbody></tbody></table></div></div>
+    <div class="panel"><div class="hd">Engine specification &amp; limits</div><div class="bd">
+      <div class="grid" style="grid-template-columns:1fr 1fr">
+        <div class="kv" id="spec-kv"></div><div class="kv" id="lim-kv"></div></div></div></div>
+  </div>
+  <div class="panel" style="margin-top:12px"><div class="hd">Processing chain</div><div class="bd">
+    <pre class="mono" style="margin:0;color:var(--dim);font-size:11.5px;line-height:1.7;overflow-x:auto">
+ ENGINE ──► sensors ──► ECU/FADEC ──► CAN 2.0B, J1939 framing, 500 kbit/s ──► edge node
+                                                                                  │
+                                     ┌────────────────────────────────────────────┘
+                                     ▼
+  ┌───────────────────── DIGITAL TWIN CORE ──────────────────────┐
+  │  reference model   healthy physics engine clamped to the      │
+  │                    measured operating point                   │
+  │  UKF sync          8-state unscented filter over the plant     │
+  │                    model; innovations are the residual basis   │
+  │  feature build     26 physics-normalised residuals & indices   │
+  │  AI/ML             PCA (T² + SPE) ∥ autoencoder ∥ CUSUM        │
+  │  health            8 subsystem indices with confidence         │
+  │  FDI               structured-residual signature matrix        │
+  │  RUL               local-linear-trend Kalman + 90 % band       │
+  │  advisory          urgency-ranked actions + mission call       │
+  └───────────────────────────────────────────────────────────────┘
+                                     │
+             ┌───────────────────────┼────────────────────────┐
+             ▼                       ▼                        ▼
+      operator dashboard      flight data recorder      fleet / depot
+        (SSE, this page)      (SQLite, replay)          health records
+    </pre></div></div>
+</section>
+</main>
+
+<script>
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const F=(v,d=1)=>(v===null||v===undefined||Number.isNaN(v))?'—':Number(v).toFixed(d);
+let SNAP=null, CFG=null, HIST=[], MAXH=900;
+
+/* ---------- tabs ---------- */
+$$('.tab').forEach(t=>t.onclick=()=>{
+  $$('.tab').forEach(x=>x.classList.toggle('on',x===t));
+  ['live','diag','maint','replay','icd'].forEach(n=>
+    $('#v-'+n).classList.toggle('hide', n!==t.dataset.t));
+  if(t.dataset.t==='replay') loadSessions();
+  if(SNAP) render(SNAP);
+});
+
+/* ---------- charts ---------- */
+function chart(id, series, opts={}){
+  const c=$('#'+id), dpr=devicePixelRatio||1;
+  const w=c.clientWidth||600, h=+c.getAttribute('height');
+  if(c.width!==w*dpr){c.width=w*dpr;c.height=h*dpr;}
+  const g=c.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,w,h);
+  const P={l:38,r:8,t:8,b:16}, W=w-P.l-P.r, H=h-P.t-P.b;
+  const all=series.flatMap(s=>s.data).filter(v=>v!=null&&!Number.isNaN(v));
+  if(!all.length){g.fillStyle='#8798ab';g.font='11px system-ui';g.fillText('awaiting data',P.l+6,h/2);return;}
+  let lo=opts.min!=null?opts.min:Math.min(...all), hi=opts.max!=null?opts.max:Math.max(...all);
+  if(hi-lo<1e-6){hi=lo+1;lo-=1;} const pad=(hi-lo)*0.10; lo-=pad; hi+=pad;
+  const n=Math.max(...series.map(s=>s.data.length));
+  const X=i=>P.l+(n<2?W:W*i/(n-1)), Y=v=>P.t+H-H*(v-lo)/(hi-lo);
+  g.strokeStyle='#243040'; g.lineWidth=1; g.fillStyle='#8798ab'; g.font='10px ui-monospace,monospace';
+  for(let k=0;k<=3;k++){const v=lo+(hi-lo)*k/3, y=Y(v);
+    g.beginPath();g.moveTo(P.l,y);g.lineTo(w-P.r,y);g.stroke();
+    g.fillText(v.toFixed(Math.abs(hi-lo)>20?0:2), 3, y+3);}
+  if(opts.ref!=null&&opts.ref>=lo&&opts.ref<=hi){g.strokeStyle='#3a4a5e';g.setLineDash([3,3]);
+    g.beginPath();g.moveTo(P.l,Y(opts.ref));g.lineTo(w-P.r,Y(opts.ref));g.stroke();g.setLineDash([]);}
+  series.forEach(s=>{g.strokeStyle=s.color;g.lineWidth=1.5;g.beginPath();let st=false;
+    s.data.forEach((v,i)=>{if(v==null||Number.isNaN(v)){st=false;return;}
+      const x=X(i+n-s.data.length),y=Y(v); st?g.lineTo(x,y):g.moveTo(x,y); st=true;});
+    g.stroke();});
+}
+function legend(id,series){$('#'+id).innerHTML=series.map(s=>
+  `<span><i style="background:${s.color}"></i>${s.name}</span>`).join('');}
+
+function ring(v){
+  const c=$('#ring'),dpr=devicePixelRatio||1;
+  if(c.width!==112*dpr){c.width=112*dpr;c.height=112*dpr;}
+  const g=c.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,112,112);
+  const col=v>=85?'#37c98b':v>=70?'#e8b73a':v>=50?'#f0743a':'#ef4a5a';
+  g.lineWidth=11;g.strokeStyle='#1d2632';g.beginPath();g.arc(56,56,44,0,Math.PI*2);g.stroke();
+  g.strokeStyle=col;g.lineCap='round';g.beginPath();
+  g.arc(56,56,44,-Math.PI/2,-Math.PI/2+Math.PI*2*Math.max(0,Math.min(100,v))/100);g.stroke();
+  g.fillStyle=col;g.font='600 21px ui-monospace,monospace';g.textAlign='center';
+  g.fillText(v.toFixed(0),56,62);
+}
+
+/* ---------- gauge definitions (caution / limit from the certified envelope) ---------- */
+const GA=[
+ {k:'rpm',       l:'RPM',        u:'',    d:0, max:6000, cau:5600, lim:5900},
+ {k:'map_kpa',   l:'MAP',        u:'kPa', d:1, max:160,  cau:140,  lim:150},
+ {k:'__chtmax',  l:'CHT max',    u:'°C',  d:1, max:150,  cau:120,  lim:135},
+ {k:'__egtmax',  l:'EGT max',    u:'°C',  d:0, max:960,  cau:850,  lim:900},
+ {k:'oil_press_kpa',l:'Oil press',u:'kPa',d:0, max:560,  lo:120,   lolim:80},
+ {k:'oil_temp_c',l:'Oil temp',   u:'°C',  d:1, max:145,  cau:120,  lim:130},
+ {k:'coolant_temp_c',l:'Coolant',u:'°C',  d:1, max:135,  cau:105,  lim:120},
+ {k:'fuel_flow_lph',l:'Fuel flow',u:'L/h',d:1, max:40},
+ {k:'vib_rms_g', l:'Vibration',  u:'g',   d:2, max:3.0,  cau:1.5,  lim:2.5},
+ {k:'iat_c',     l:'Intake air', u:'°C',  d:1, max:110},
+ {k:'bus_v',     l:'Bus voltage',u:'V',   d:2, max:16,   lo:12.4,  lolim:12.0},
+ {k:'prop_load_pct',l:'Prop load',u:'%',  d:0, max:100},
+];
+function gauges(s){
+  const m=s.meas||{}, r=s.ref||{};
+  $('#gauges').innerHTML=GA.map(a=>{
+    let v = a.k==='__chtmax'? s.peak?.cht_max_c : a.k==='__egtmax'? s.peak?.egt_max_c : m[a.k];
+    let rv= a.k==='__chtmax'? Math.max(...[1,2,3,4].map(i=>r['cht'+i+'_c']??0))
+          : a.k==='__egtmax'? Math.max(...[1,2,3,4].map(i=>r['egt'+i+'_c']??0)) : r[a.k];
+    let cls='';
+    if(v!=null){
+      if(a.lim!=null&&v>=a.lim) cls='crit'; else if(a.cau!=null&&v>=a.cau) cls='caution';
+      if(a.lolim!=null&&v<=a.lolim) cls='crit'; else if(a.lo!=null&&v<=a.lo&&!cls) cls='caution';
+    }
+    const pct=v==null?0:Math.max(0,Math.min(100,100*v/a.max));
+    const refTxt=(rv!=null&&isFinite(rv)&&rv!==0)?`new: ${F(rv,a.d)}`:'&nbsp;';
+    return `<div class="g ${cls}"><div class="lbl">${a.l}</div>
+      <div class="val">${F(v,a.d)}<span class="unit">${a.u}</span></div>
+      <div class="bar"><i style="width:${pct}%"></i></div>
+      <div class="ref">${refTxt}</div></div>`;}).join('');
+}
+
+function cylinders(s){
+  const m=s.meas||{};
+  [['cht','#cyl-cht',1],['egt','#cyl-egt',0]].forEach(([p,sel,dp])=>{
+    const vals=[1,2,3,4].map(i=>m[p+i+'_c']);
+    const ok=vals.filter(v=>v!=null&&v>-50); const mu=ok.length?ok.reduce((a,b)=>a+b,0)/ok.length:0;
+    const tol=p==='cht'?9:32;
+    $(sel).innerHTML=vals.map((v,i)=>{
+      const dev=v!=null&&Math.abs(v-mu)>tol;
+      const d=v!=null?(v-mu):null;
+      return `<div class="c ${dev?'dev':''}"><div class="t">CYL ${i+1}</div>
+        <div class="v">${F(v,dp)}</div>
+        <div class="t">${d==null?'':(d>0?'+':'')+d.toFixed(dp)}</div></div>`;}).join('');
+  });
+}
+
+const SUBN={combustion:'Combustion',air_path:'Air path',fuel_injection:'Fuel injection',
+  cooling:'Cooling',lubrication:'Lubrication',mechanical:'Mechanical',
+  electrical:'Electrical',sensing:'Sensing'};
+function hcol(v){return v>=85?'#37c98b':v>=70?'#e8b73a':v>=50?'#f0743a':'#ef4a5a';}
+function hbars(s){
+  const h=s.health||{},x=h.subsystems||{},cf=h.confidence||{};
+  $('#hbars').innerHTML=Object.keys(SUBN).map(k=>{const v=x[k]??100;
+    return `<div class="hb"><span title="confidence ${((cf[k]||0)*100).toFixed(0)}%">${SUBN[k]}</span>
+      <span class="track"><i style="width:${v}%;background:${hcol(v)}"></i></span>
+      <span class="n" style="color:${hcol(v)}">${F(v,0)}</span></div>`;}).join('');
+}
+
+function alerts(s){
+  const a=(s.alerts||[]).slice().reverse();
+  $('#alerts').innerHTML=a.length?a.map(x=>{
+    const c=x.level==='warning'?'i-crit':x.level==='caution'?'i-caution':'i-info';
+    const tg=x.level==='warning'?'crit':x.level==='caution'?'caution':'';
+    return `<div class="item ${c}"><div class="t"><span class="tag ${tg}">${x.source.toUpperCase()}</span>
+      ${x.text}<span class="spacer"></span><span class="mono" style="color:var(--dim);font-size:11px">t+${F(x.t_s,0)}s</span></div></div>`;
+  }).join(''):'<div class="empty">No alerts — all parameters nominal.</div>';
+}
+
+/* ---------- diagnostics ---------- */
+function diag(s){
+  const an=s.anomaly||{};
+  $('#anom-kv').innerHTML=[
+    ['Fused score',F(an.score,3)],['Status',(an.status||'—').toUpperCase()],
+    ['Hotelling T² / limit',F(an.t2_norm,3)],['SPE (Q) / limit',F(an.spe_norm,3)],
+    ['Autoencoder error / limit',F(an.recon_norm,3)],['CUSUM drift score',F(an.drift_score,3)],
+    ['Channels drifting',(an.drifting||[]).length]
+  ].map(([k,v])=>`<span class="k">${k}</span><span class="v">${v}</span>`).join('');
+  const tb=$('#contrib tbody');
+  tb.innerHTML=(an.contributors||[]).map(c=>
+    `<tr><td class="mono">${c.feature}</td><td class="n">${(c.share*100).toFixed(1)}%</td>
+     <td class="n" style="color:${Math.abs(c.sigma)>3?'var(--warn)':'var(--fg)'}">${F(c.sigma,2)}</td></tr>`).join('')
+    ||'<tr><td colspan="3" class="empty">Model not trained — run scripts/train.py</td></tr>';
+
+  const hs=(s.diagnostics||{}).hypotheses||[];
+  $('#hyps').innerHTML=hs.length?hs.map(h=>{
+    const c=h.confidence, cl=c>.7?'i-crit':c>.45?'i-warn':'i-caution';
+    const where=h.cylinder?` · cylinder ${h.cylinder}`:(h.channel?` · ${h.channel}`:'');
+    return `<div class="item ${cl}"><div class="t">${h.fault.replace(/_/g,' ')}${where}
+      <span class="spacer"></span><span class="tag ${c>.7?'crit':c>.45?'warn':'caution'}">${(c*100).toFixed(0)}%</span></div>
+      <ul>${(h.evidence||[]).map(e=>`<li>${e}</li>`).join('')}
+      ${(h.against||[]).map(e=>`<li style="color:var(--dim)">counter-evidence: ${e}</li>`).join('')}</ul>
+      <div class="d">${h.action||''}</div></div>`;}).join('')
+    :'<div class="empty">No fault hypothesis above the reporting threshold.</div>';
+
+  const sy=(s.diagnostics||{}).symptoms||{};
+  const ks=Object.keys(sy).sort((a,b)=>sy[b]-sy[a]);
+  $('#symptoms tbody').innerHTML=ks.length?ks.map(k=>
+    `<tr><td>${k.replace(/_/g,' ')}</td><td class="n">
+      <span style="display:inline-block;width:60px;height:6px;background:#1d2632;border-radius:3px;vertical-align:middle;margin-right:6px">
+      <i style="display:block;height:100%;width:${sy[k]*100}%;background:${sy[k]>.6?'var(--warn)':'var(--caution)'};border-radius:3px"></i></span>
+      ${(sy[k]*100).toFixed(0)}%</td></tr>`).join('')
+    :'<tr><td colspan="2" class="empty">No symptoms active.</td></tr>';
+
+  const m=s.meas||{},e=s.est||{},sg=s.est_sigma||{},r=s.resid||{},rb=s.resid_bias||{};
+  $('#resid tbody').innerHTML=Object.keys(e).map(k=>{
+    const iv=r[k], bs=rb[k];
+    const col=Math.abs(bs??0)>2?'var(--warn)':'var(--fg)';
+    return `<tr><td class="mono">${k}</td><td class="n">${F(m[k],2)}</td><td class="n">${F(e[k],2)}</td>
+      <td class="n" style="color:var(--dim)">${F(sg[k],3)}</td>
+      <td class="n">${F(iv,2)}</td><td class="n" style="color:${col}">${F(bs,2)}</td></tr>`;}).join('');
+}
+
+/* ---------- maintenance ---------- */
+const URG={ABORT:'i-crit',IMMEDIATE:'i-crit',BEFORE_NEXT_FLIGHT:'i-warn',
+           SCHEDULED:'i-caution',MONITOR:'i-info'};
+function maint(s){
+  const ad=s.advisories||[];
+  $('#advisories').innerHTML=ad.length?ad.map(a=>
+    `<div class="item ${URG[a.urgency]||'i-info'}"><div class="t">
+      <span class="tag ${a.urgency==='ABORT'||a.urgency==='IMMEDIATE'?'crit':a.urgency==='BEFORE_NEXT_FLIGHT'?'warn':'caution'}">${a.urgency.replace(/_/g,' ')}</span>
+      ${a.title}<span class="spacer"></span>
+      ${a.due_hours!=null?`<span class="mono" style="color:var(--dim)">due in ${F(a.due_hours,1)} h</span>`:''}</div>
+      <div class="d">${a.detail}</div>
+      ${a.evidence?.length?`<ul>${a.evidence.map(e=>`<li>${e}</li>`).join('')}</ul>`:''}
+      <div class="d" style="color:var(--accent);margin-top:5px">▸ ${a.action}</div></div>`).join('')
+    :'<div class="empty">No maintenance action required.</div>';
+
+  const R=s.rul||{},E=R.engine||{};
+  $('#rul-kv').innerHTML=[
+    ['Engine RUL',E.rul_hours!=null?F(E.rul_hours,1)+' h':'no significant trend'],
+    ['90 % band',E.lower_hours!=null?`${F(E.lower_hours,0)} – ${F(E.upper_hours,0)} h`:'—'],
+    ['Limiting subsystem',E.driver?SUBN[E.driver]||E.driver:'—'],
+    ['Hours to overhaul',F(E.tbo_remaining_hours,1)+' h'],
+    ['Basis',E.basis||'—']
+  ].map(([k,v])=>`<span class="k">${k}</span><span class="v" style="text-align:left;font-size:11.5px">${v}</span>`).join('');
+
+  $('#rul-tbl tbody').innerHTML=Object.entries(R.subsystems||{}).map(([k,v])=>
+    `<tr><td>${SUBN[k]||k}</td><td class="n" style="color:${hcol(v.level)}">${F(v.level,1)}</td>
+     <td class="n">${F(v.slope_per_hour,3)}</td>
+     <td class="n">${v.rul_hours!=null?F(v.rul_hours,1):'—'}</td>
+     <td class="n" style="color:var(--dim)">${v.lower_hours!=null?F(v.lower_hours,0)+'–'+F(v.upper_hours,0):'—'}</td>
+     <td class="n" style="color:var(--dim)">${((v.confidence||0)*100).toFixed(0)}%</td></tr>`).join('');
+
+  const d=s.degradation||{};
+  $('#deg-kv').innerHTML=[
+    ['Total engine hours',F(d.total_hours,1)],['Hours on current oil',F(d.oil_hours,1)],
+    ['Hours with detonation',F(d.knock_hours,2)],['Hours over temperature',F(d.overtemp_hours,2)]
+  ].map(([k,v])=>`<span class="k">${k}</span><span class="v">${v}</span>`).join('');
+}
+
+/* ---------- history & render ---------- */
+function push(s){
+  const m=s.meas||{},d=s.derived||{},h=(s.health||{}).subsystems||{};
+  HIST.push({t:s.t_s,cht:s.peak?.cht_max_c,egt:s.peak?.egt_max_c,oil:m.oil_temp_c,
+    cool:m.coolant_temp_c,ve:d.ve_index,pw:d.power_index,cl:d.cooling_effectiveness,
+    op:d.oil_press_index,an:(s.anomaly||{}).score,t2:(s.anomaly||{}).t2_norm,
+    spe:(s.anomaly||{}).spe_norm,ae:(s.anomaly||{}).recon_norm,
+    ho:(s.health||{}).overall,hcomb:h.combustion,hcool:h.cooling,hlub:h.lubrication,hmech:h.mechanical});
+  if(HIST.length>MAXH) HIST.shift();
+}
+const col=(k)=>({cht:'#ef4a5a',egt:'#f0743a',oil:'#e8b73a',cool:'#3fa9f5'}[k]);
+function render(s){
+  const st=s.mission||{}, b=$('#mission-badge');
+  b.textContent=(st.decision||'—').replace(/_/g,' ');
+  b.className='badge '+(st.colour==='red'?'b-red':st.colour==='amber'?'b-amber':'b-green');
+  b.title=st.rationale||'';
+  $('#hdr-sub').textContent=`t+${F(s.t_s,0)}s · ${s.phase||''} · ${F(s.env?.altitude_m,0)} m · OAT ${F(s.env?.oat_c,1)} °C · ISA${(s.env?.isa_dev_k>=0?'+':'')}${F(s.env?.isa_dev_k,0)}`;
+  $('#regime-tag').textContent=s.regime||'';
+  gauges(s); cylinders(s); hbars(s); alerts(s);
+  ring((s.health||{}).overall??0);
+  $('#h-overall').textContent=F((s.health||{}).overall,1);
+  $('#h-hours').textContent=F(s.engine_hours,2);
+  $('#h-regime').textContent=s.regime||'—';
+  $('#h-steady').textContent=s.steady_state?'yes':'no';
+
+  const T=[{name:'CHT max',color:col('cht'),data:HIST.map(x=>x.cht)},
+           {name:'EGT max ÷5',color:col('egt'),data:HIST.map(x=>x.egt/5)},
+           {name:'Oil',color:col('oil'),data:HIST.map(x=>x.oil)},
+           {name:'Coolant',color:col('cool'),data:HIST.map(x=>x.cool)}];
+  chart('ch-temp',T); legend('lg-temp',T);
+  const E=[{name:'breathing',color:'#3fa9f5',data:HIST.map(x=>x.ve)},
+           {name:'power',color:'#37c98b',data:HIST.map(x=>x.pw)},
+           {name:'cooling',color:'#e8b73a',data:HIST.map(x=>x.cl)},
+           {name:'oil pressure',color:'#c084fc',data:HIST.map(x=>x.op)}];
+  chart('ch-eff',E,{ref:1.0}); legend('lg-eff',E);
+  const H=[{name:'overall',color:'#dbe4ee',data:HIST.map(x=>x.ho)},
+           {name:'combustion',color:'#f0743a',data:HIST.map(x=>x.hcomb)},
+           {name:'cooling',color:'#3fa9f5',data:HIST.map(x=>x.hcool)},
+           {name:'lubrication',color:'#e8b73a',data:HIST.map(x=>x.hlub)},
+           {name:'mechanical',color:'#37c98b',data:HIST.map(x=>x.hmech)}];
+  chart('ch-health',H,{min:0,max:100}); legend('lg-health',H);
+  const A=[{name:'fused',color:'#ef4a5a',data:HIST.map(x=>x.an)},
+           {name:'T²',color:'#3fa9f5',data:HIST.map(x=>x.t2)},
+           {name:'SPE',color:'#e8b73a',data:HIST.map(x=>x.spe)},
+           {name:'autoencoder',color:'#37c98b',data:HIST.map(x=>x.ae)}];
+  chart('ch-anom',A,{ref:1.0}); legend('lg-anom',A);
+  diag(s); maint(s);
+}
+
+/* ---------- control ---------- */
+async function post(body){const r=await fetch('/api/control',{method:'POST',
+  headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});return r.json();}
+$('#btn-run').onclick=()=>post({action:'run'});
+$('#btn-pause').onclick=()=>post({action:'pause'});
+$('#speed').onchange=e=>post({action:'speed',value:+e.target.value});
+$('#btn-reset').onclick=async()=>{HIST=[];
+  await post({action:'reset',profile:$('#profile').value,scenario:$('#scenario').value,
+              initial_hours:+$('#hours').value,record:true});
+  post({action:'run'});};
+$('#btn-inject').onclick=async()=>{
+  const r=await post({action:'inject',fault:{kind:$('#f-kind').value,
+    cylinder:$('#f-cyl').value||null,channel:$('#f-chan').value||null,
+    severity:+$('#f-sev').value,profile:$('#f-prof').value,duration_s:+$('#f-dur').value}});
+  $('#inject-msg').textContent=r.ok?`injected ${r.event} at t+${F(r.onset_s,0)}s`:('error: '+r.error);};
+$('#btn-service').onclick=async()=>{
+  const r=await post({action:'service',item:$('#svc-item').value});
+  $('#svc-msg').textContent=r.message||r.error||'';};
+
+/* ---------- replay ---------- */
+async function loadSessions(){
+  const r=await (await fetch('/api/sessions')).json();
+  $('#sessions').innerHTML=r.map(s=>`<option value="${s.id}">#${s.id} ${s.name} · ${F(s.duration_s/60,1)} min · ${s.samples} samples · ${s.events} events</option>`).join('')
+    ||'<option>no recorded sorties</option>';
+}
+$('#btn-sessions').onclick=loadSessions;
+$('#btn-load').onclick=async()=>{
+  const id=$('#sessions').value; if(!id)return;
+  const r=await (await fetch('/api/report/'+id)).json();
+  const d=r.health_delta||{}, pk=r.peaks||{};
+  $('#report').innerHTML=`
+   <div class="grid" style="grid-template-columns:1fr 1fr 1fr">
+    <div class="panel"><div class="hd">Sortie</div><div class="bd"><div class="kv">
+      ${[['Duration',F(r.duration_h,2)+' h'],['Fuel burn',F(r.fuel_burn_l,1)+' L'],
+         ['Engine hours',`${F(r.engine_hours_start,2)} → ${F(r.engine_hours_end,2)}`],
+         ['Overall health',`${F(r.health_start?.overall,1)} → ${F(r.health_end?.overall,1)}`],
+         ['Engine RUL',r.rul_end?.rul_hours!=null?F(r.rul_end.rul_hours,1)+' h':'no trend']]
+        .map(([k,v])=>`<span class="k">${k}</span><span class="v">${v}</span>`).join('')}
+      </div><div style="margin-top:10px;font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.6px">Time by phase</div>
+      <div class="kv">${Object.entries(r.phase_seconds||{}).sort((a,b)=>b[1]-a[1]).map(([k,v])=>
+        `<span class="k">${k}</span><span class="v">${F(v/60,1)} min</span>`).join('')}</div>
+    </div></div>
+    <div class="panel"><div class="hd">Health change over the sortie</div><div class="bd">
+      <table><thead><tr><th>Subsystem</th><th class="n">Start</th><th class="n">End</th><th class="n">Δ</th></tr></thead><tbody>
+      ${Object.keys(SUBN).map(k=>`<tr><td>${SUBN[k]}</td>
+        <td class="n">${F(r.health_start?.subsystems?.[k],1)}</td>
+        <td class="n">${F(r.health_end?.subsystems?.[k],1)}</td>
+        <td class="n" style="color:${(d[k]||0)<-1?'var(--warn)':(d[k]||0)>1?'var(--ok)':'var(--dim)'}">${(d[k]>0?'+':'')+F(d[k],1)}</td></tr>`).join('')}
+      </tbody></table></div></div>
+    <div class="panel"><div class="hd">Peaks &amp; events</div><div class="bd">
+      <table><thead><tr><th>Parameter</th><th class="n">Min</th><th class="n">Mean</th><th class="n">Max</th></tr></thead><tbody>
+      ${Object.entries(pk).map(([k,v])=>`<tr><td>${k.replace(/_/g,' ')}</td>
+        <td class="n">${F(v.min,1)}</td><td class="n">${F(v.mean,1)}</td><td class="n">${F(v.max,1)}</td></tr>`).join('')}
+      </tbody></table>
+      <div style="margin-top:10px" class="list">${(r.events||[]).slice(-12).reverse().map(e=>
+        `<div class="item ${e.severity==='warning'?'i-crit':'i-caution'}"><div class="t">
+        <span class="tag ${e.severity==='warning'?'crit':'caution'}">${e.kind}</span>${e.summary}
+        <span class="spacer"></span><span class="mono" style="color:var(--dim);font-size:11px">t+${F(e.t_s,0)}s</span></div></div>`).join('')
+        ||'<div class="empty">No events recorded.</div>'}</div>
+    </div></div>
+   </div>
+   <div class="panel" style="margin-top:12px"><div class="hd">Advisories at end of sortie</div><div class="bd">
+     <div class="list">${(r.advisories_end||[]).map(a=>
+       `<div class="item ${URG[a.urgency]||'i-info'}"><div class="t"><span class="tag">${a.urgency.replace(/_/g,' ')}</span>${a.title}</div>
+        <div class="d">${a.detail}</div><div class="d" style="color:var(--accent)">▸ ${a.action}</div></div>`).join('')
+       ||'<div class="empty">None.</div>'}</div></div></div>`;
+};
+
+/* ---------- boot ---------- */
+async function boot(){
+  CFG=await (await fetch('/api/config')).json();
+  const sc=await (await fetch('/api/scenarios')).json();
+  const pr=await (await fetch('/api/profiles')).json();
+  const st=await (await fetch('/api/status')).json();
+  $('#profile').innerHTML=pr.map(p=>`<option ${p===st.profile?'selected':''}>${p}</option>`).join('');
+  $('#scenario').innerHTML=sc.scenarios.map(p=>`<option ${p===st.scenario?'selected':''}>${p}</option>`).join('');
+  $('#hours').value=st.initial_hours;
+  $('#f-kind').innerHTML=Object.keys(sc.faults).map(k=>`<option>${k}</option>`).join('');
+  $('#f-chan').innerHTML='<option value="">—</option>'+CFG.sensors.map(s=>`<option>${s}</option>`).join('');
+
+  $('#can-kv').innerHTML=[['Transport','SocketCAN / virtual loopback'],
+    ['Bit rate',(CFG.can.bitrate/1000)+' kbit/s'],['Frame format','29-bit extended, J1939 style'],
+    ['Steady bus load',CFG.can.load_pct+' %'],['PGNs published',CFG.can.pgns.length],
+    ['Signals',CFG.sensors.length]].map(([k,v])=>`<span class="k">${k}</span><span class="v">${v}</span>`).join('');
+  $('#pgns tbody').innerHTML=CFG.can.pgns.map(p=>{
+    const pn=parseInt(p.pgn,16), id=((3&7)<<26)|((pn&0x3FFFF)<<8);
+    return `<tr><td class="mono">0x${id.toString(16).toUpperCase().padStart(8,'0')}</td>
+      <td class="mono">${p.pgn} ${p.name}</td><td class="n">${p.rate_hz}</td>
+      <td class="mono" style="font-size:11px">${p.signals.join(', ')}</td></tr>`;}).join('');
+  $('#spec-kv').innerHTML=Object.entries(CFG.engine).map(([k,v])=>
+    `<span class="k">${k.replace(/_/g,' ')}</span><span class="v">${typeof v==='number'?(+v).toFixed(3).replace(/\.?0+$/,''):v}</span>`).join('');
+  $('#lim-kv').innerHTML=Object.entries(CFG.limits).map(([k,v])=>
+    `<span class="k">${k.replace(/_/g,' ')}</span><span class="v">${v}</span>`).join('');
+
+  const es=new EventSource('/api/stream');
+  es.onmessage=ev=>{try{SNAP=JSON.parse(ev.data);push(SNAP);render(SNAP);}catch(e){}};
+  es.onerror=()=>{$('#hdr-sub').textContent='stream disconnected — reconnecting…';};
+  loadSessions();
+}
+boot();
+window.addEventListener('resize',()=>{if(SNAP)render(SNAP);});
+</script>
+</body></html>

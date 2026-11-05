@@ -1,0 +1,8 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "deploy": {
+    "startCommand": "python3 scripts/serve.py",
+    "healthcheckPath": "/healthz",
+    "restartPolicyType": "ON_FAILURE"
+  }
+}

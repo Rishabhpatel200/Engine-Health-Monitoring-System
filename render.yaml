@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: aero-dt
+    runtime: python
+    plan: free
+    buildCommand: echo "no dependencies to install"
+    startCommand: python3 scripts/serve.py
+    healthCheckPath: /healthz
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.3
